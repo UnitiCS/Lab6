@@ -1,0 +1,203 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список продукции</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.0/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="errors" style="display: none;"></div>
+    <h2>Список продукции</h2>
+    <form name="bakeryForm">
+        <input type="hidden" name="id" value="0" />
+        <div class="form-group col-md-5">
+            <label for="name">Название:</label>
+            <input class="form-control" name="name" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="type">Тип:</label>
+            <input class="form-control" name="type" />
+        </div>
+        <div class="form-group col-md-10">
+            <label for="description">Описание:</label>
+            <textarea class="form-control" name="description"></textarea>
+        </div>
+        <div class="panel-body">
+            <button type="submit" id="submit" class="btn btn-primary">Сохранить</button>
+            <a id="reset" class="btn btn-primary">Сбросить</a>
+        </div>
+    </form>
+    <table class="table table-condensed table-striped col-md-10">
+        <thead><tr><th>Id</th><th>Название</th><th>Тип</th><th>Описание</th><th></th></tr></thead>
+        <tbody>
+        </tbody>
+    </table>
+    <div>2024 © Ваш сайт</div>
+
+    <script>
+        // Получение всей продукции
+        async function GetBakeryProducts() {
+            const response = await fetch("/api/bakery", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const bakeryProducts = await response.json();
+                let rows = document.querySelector("tbody");
+                bakeryProducts.forEach(bakeryProduct => {
+                    rows.append(rowBakeryProduct(bakeryProduct));
+                });
+            }
+        }
+
+        // Получение одного продукта
+        async function GetBakeryProduct(id) {
+            const response = await fetch("/api/bakery/" + id, {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const bakeryProduct = await response.json();
+                const form = document.forms["bakeryForm"];
+                form.elements["id"].value = bakeryProduct.bakeryProductId;
+                form.elements["name"].value = bakeryProduct.name;
+                form.elements["type"].value = bakeryProduct.type;
+                form.elements["description"].value = bakeryProduct.description;
+            }
+        }
+
+        // Добавление продукта
+        async function CreateBakeryProduct(name, type, description) {
+            const response = await fetch("/api/bakery", {
+                method: "POST",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: name,
+                    type: type,
+                    description: description
+                })
+            });
+
+            if (response.ok === true) {
+                const bakeryProduct = await response.json();
+                resetBakeryForm();
+                document.querySelector("tbody").append(rowBakeryProduct(bakeryProduct));
+            } else {
+                await handleErrors(response);
+            }
+        }
+
+        // Изменение продукта
+        async function EditBakeryProduct(bakeryProductId, name, type, description) {
+            const response = await fetch("/api/bakery/" + bakeryProductId, {
+                method: "PUT",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    bakeryProductId: bakeryProductId,
+                    name: name,
+                    type: type,
+                    description: description
+                })
+            });
+            if (response.ok === true) {
+                const bakeryProduct = await response.json();
+                resetBakeryForm();
+                document.querySelector("tr[data-rowid='" + bakeryProduct.bakeryProductId + "']").replaceWith(rowBakeryProduct(bakeryProduct));
+            }
+        }
+
+        // Удаление продукта
+        async function DeleteBakeryProduct(bakeryProductId) {
+            const response = await fetch("/api/bakery/" + bakeryProductId, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const bakeryProduct = await response.json();
+                document.querySelector("tr[data-rowid='" + bakeryProduct.bakeryProductId + "']").remove();
+            }
+        }
+
+        // Сброс формы для продукта
+        function resetBakeryForm() {
+            const form = document.forms["bakeryForm"];
+            form.reset();
+            form.elements["id"].value = 0;
+        }
+
+        // Создание строки для таблицы продукта
+        function rowBakeryProduct(bakeryProduct) {
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", bakeryProduct.bakeryProductId);
+
+            const idTd = document.createElement("td");
+            idTd.append(bakeryProduct.bakeryProductId);
+            tr.append(idTd);
+
+            const nameTd = document.createElement("td");
+            nameTd.append(bakeryProduct.name);
+            tr.append(nameTd);
+
+            const typeTd = document.createElement("td");
+            typeTd.append(bakeryProduct.type);
+            tr.append(typeTd);
+
+            const descriptionTd = document.createElement("td");
+            descriptionTd.append(bakeryProduct.description);
+            tr.append(descriptionTd);
+
+            const linksTd = document.createElement("td");
+
+            const editLink = document.createElement("a");
+            editLink.setAttribute("data-id", bakeryProduct.bakeryProductId);
+            editLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            editLink.append("Изменить");
+            editLink.addEventListener("click", e => {
+                e.preventDefault();
+                GetBakeryProduct(bakeryProduct.bakeryProductId);
+            });
+            linksTd.append(editLink);
+
+            const removeLink = document.createElement("a");
+            removeLink.setAttribute("data-id", bakeryProduct.bakeryProductId);
+            removeLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            removeLink.append("Удалить");
+            removeLink.addEventListener("click", e => {
+                e.preventDefault();
+                DeleteBakeryProduct(bakeryProduct.bakeryProductId);
+            });
+
+            linksTd.append(removeLink);
+            tr.appendChild(linksTd);
+
+            return tr;
+        }
+
+        // Сброс значений формы продукта
+        document.getElementById("reset").addEventListener("click", function (e) {
+            e.preventDefault();
+            resetBakeryForm();
+        });
+
+        // Отправка формы продукта
+        document.forms["bakeryForm"].addEventListener("submit", e => {
+            e.preventDefault();
+            const form = document.forms["bakeryForm"];
+            const id = form.elements["id"].value;
+            const name = form.elements["name"].value;
+            const type = form.elements["type"].value;
+            const description = form.elements["description"].value;
+
+            if (id == 0)
+                CreateBakeryProduct(name, type, description);
+            else
+                EditBakeryProduct(id, name, type, description);
+        });
+
+        // Загрузка продукции
+        GetBakeryProducts();
+
+    </script>
+</body>
+</html>

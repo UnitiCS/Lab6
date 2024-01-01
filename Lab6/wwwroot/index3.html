@@ -1,0 +1,285 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Список продукции</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+</head>
+<body>
+    <div id="errors" style="display: none;"></div>
+    <h2>Список заказов</h2>
+    <form name="orderForm">
+        <input type="hidden" name="id" value="0" />
+        <div class="form-group col-md-5">
+            <label for="customerName">Имя заказчика:</label>
+            <input class="form-control" name="customerName" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="productName">Наименование продукта:</label>
+            <input class="form-control" name="productName" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="productType">Тип продукта:</label>
+            <input class="form-control" name="productType" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="quantity">Количество:</label>
+            <input class="form-control" name="quantity" type="number" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="price">Цена:</label>
+            <input class="form-control" name="price" type="number" step="0.01" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="orderDate">Дата заказа:</label>
+            <input class="form-control" name="orderDate" type="date" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="deliveryDate">Дата доставки:</label>
+            <input class="form-control" name="deliveryDate" type="date" />
+        </div>
+        <div class="panel-body">
+            <button type="submit" id="submit" class="btn btn-primary">Сохранить</button>
+            <a id="reset" class="btn btn-primary">Сбросить</a>
+        </div>
+    </form>
+    <table class="table table-condensed table-striped col-md-10">
+        <thead><tr><th>Id</th><th>Имя заказчика</th><th>Продукт</th><th>Тип продукта</th><th>Количество</th><th>Цена</th><th>Дата заказа</th><th>Дата доставки</th><th></th></tr></thead>
+        <tbody>
+        </tbody>
+    </table>
+    <div>2024 © Ваш сайт</div>
+
+    <script>
+        // Получение всех заказов
+        async function GetOrders() {
+            const response = await fetch("/api/order", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const orders = await response.json();
+                let rows = document.querySelector("tbody");
+                orders.forEach(order => {
+                    rows.append(rowOrder(order));
+                });
+            }
+        }
+
+        // Получение одного заказа
+        async function GetOrder(id) {
+            const response = await fetch("/api/order/" + id, {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const order = await response.json();
+                const form = document.forms["orderForm"];
+                form.elements["id"].value = order.orderId;
+                form.elements["customerName"].value = order.customerName;
+                form.elements["productName"].value = order.productName;
+                form.elements["productType"].value = order.productType;
+                form.elements["quantity"].value = order.quantity;
+                form.elements["price"].value = order.price;
+                form.elements["orderDate"].value = order.orderDate.substr(0, 10);
+                form.elements["deliveryDate"].value = order.deliveryDate.substr(0, 10);
+            }
+        }
+
+        // Добавление заказа
+        async function CreateOrder(customerName, productName, productType, quantity, price, orderDate, deliveryDate) {
+            const response = await fetch("/api/order", {
+                method: "POST",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    customerName: customerName,
+                    productName: productName,
+                    productType: productType,
+                    quantity: quantity,
+                    price: price,
+                    orderDate: orderDate,
+                    deliveryDate: deliveryDate
+                })
+            });
+
+            if (response.ok === true) {
+                const order = await response.json();
+                resetOrderForm();
+                document.querySelector("tbody").append(rowOrder(order));
+            } else {
+                await handleErrors(response);
+            }
+        }
+
+        // Изменение заказа
+        async function EditOrder(orderId, customerName, productName, productType, quantity, price, orderDate, deliveryDate) {
+            const response = await fetch("/api/order/" + orderId, {
+                method: "PUT",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    customerName: customerName,
+                    productName: productName,
+                    productType: productType,
+                    quantity: quantity,
+                    price: price,
+                    orderDate: orderDate,
+                    deliveryDate: deliveryDate
+                })
+            });
+            if (response.ok === true) {
+                const order = await response.json();
+                resetOrderForm();
+                document.querySelector("tr[data-rowid='" + order.orderId + "']").replaceWith(rowOrder(order));
+            }
+        }
+
+        // Удаление заказа
+        async function DeleteOrder(orderId) {
+            const response = await fetch("/api/order/" + orderId, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const order = await response.json();
+                document.querySelector("tr[data-rowid='" + order.orderId + "']").remove();
+            }
+        }
+
+        // Сброс формы для заказа
+        function resetOrderForm() {
+            const form = document.forms["orderForm"];
+            form.reset();
+            form.elements["id"].value = 0;
+        }
+
+        // Создание строки для таблицы заказа
+        function rowOrder(order) {
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", order.orderId);
+
+            const idTd = document.createElement("td");
+            idTd.append(order.orderId);
+            tr.append(idTd);
+
+            const customerNameTd = document.createElement("td");
+            customerNameTd.append(order.customerName);
+            tr.append(customerNameTd);
+
+            const productNameTd = document.createElement("td");
+            productNameTd.append(order.productName);
+            tr.append(productNameTd);
+
+            const productTypeTd = document.createElement("td");
+            productTypeTd.append(order.productType);
+            tr.append(productTypeTd);
+
+            const quantityTd = document.createElement("td");
+            quantityTd.append(order.quantity);
+            tr.append(quantityTd);
+
+            const priceTd = document.createElement("td");
+            priceTd.append(order.price);
+            tr.append(priceTd);
+
+            const orderDateTd = document.createElement("td");
+            orderDateTd.append(order.orderDate.substr(0, 10));
+            tr.append(orderDateTd);
+
+            const deliveryDateTd = document.createElement("td");
+            deliveryDateTd.append(order.deliveryDate.substr(0, 10));
+            tr.append(deliveryDateTd);
+
+            const linksTd = document.createElement("td");
+
+            const editLink = document.createElement("a");
+            editLink.setAttribute("data-id", order.orderId);
+            editLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            editLink.append("Изменить");
+            editLink.addEventListener("click", e => {
+                e.preventDefault();
+                GetOrder(order.orderId);
+            });
+            linksTd.append(editLink);
+
+            const removeLink = document.createElement("a");
+            removeLink.setAttribute("data-id", order.orderId);
+            removeLink.setAttribute("style", "cursor:pointer;padding:15px;");
+            removeLink.append("Удалить");
+            removeLink.addEventListener("click", e => {
+                e.preventDefault();
+                DeleteOrder(order.orderId);
+            });
+
+            linksTd.append(removeLink);
+            tr.appendChild(linksTd);
+
+            return tr;
+        }
+
+        // Сброс значений формы заказа
+        document.getElementById("reset").addEventListener("click", function (e) {
+            e.preventDefault();
+            resetOrderForm();
+        });
+
+        // Отправка формы заказа
+        document.forms["orderForm"].addEventListener("submit", e => {
+            e.preventDefault();
+            const form = document.forms["orderForm"];
+            const id = form.elements["id"].value;
+            const customerName = form.elements["customerName"].value;
+            const productName = form.elements["productName"].value;
+            const productType = form.elements["productType"].value;
+            const quantity = form.elements["quantity"].value;
+            const price = form.elements["price"].value;
+            const orderDate = form.elements["orderDate"].value;
+            const deliveryDate = form.elements["deliveryDate"].value;
+
+            if (id == 0)
+                CreateOrder(customerName, productName, productType, quantity, price, orderDate, deliveryDate);
+            else
+                EditOrder(id, customerName, productName, productType, quantity, price, orderDate, deliveryDate);
+        });
+
+        // Загрузка заказов
+        GetOrders();
+
+        async function handleErrors(response) {
+            $('#errors').hide().empty();
+
+            // Парсинг JSON-объекта
+            if (response.responseText === "") {
+                $('#errors').append("<h3>" + response.statusText + "</h3>");
+            } else {
+                var responseObj = JSON.parse(response.responseText);
+                // Добавление общих ошибок модели
+                if (responseObj['']) {
+                    $.each(responseObj[''], function (index, item) {
+                        $('#errors').append("<p>" + item + "</p>");
+                    });
+                }
+                // Добавление ошибок свойства CustomerName
+                if (responseObj['CustomerName']) {
+                    $.each(responseObj['CustomerName'], function (index, item) {
+                        $('#errors').append("<p>" + item + "</p>");
+                    });
+                }
+                // Добавление ошибок свойства ProductName
+                if (responseObj['ProductName']) {
+                    $.each(responseObj['ProductName'], function (index, item) {
+                        $('#errors').append("<p>" + item + "</p>");
+                    });
+                }
+                // Добавление других необходимых проверок...
+
+            }
+
+            $('#errors').show();
+        }
+
+    </script>
+</body>
+</html>
